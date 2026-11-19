@@ -1,0 +1,9 @@
+{
+  "appId": "com.redcard.studio",
+  "appName": "RedCard Studio",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https"
+  }
+}

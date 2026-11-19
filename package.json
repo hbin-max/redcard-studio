@@ -1,0 +1,63 @@
+{
+  "name": "xiaohongshu-card-studio",
+  "productName": "RedCard Studio",
+  "version": "1.0.0",
+  "private": true,
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "pwa:build": "vite build",
+    "mobile:sync": "vite build && npx cap sync",
+    "desktop:run": "node electron/main.cjs",
+    "desktop:build-win": "C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:winexe /win32icon:app.ico /out:RedCard_Studio.exe launcher.cs",
+    "pack:mac": "electron-builder --mac",
+    "pack:win": "electron-builder --win"
+  },
+  "dependencies": {
+    "@esbuild/win32-x64": "^0.28.2",
+    "html-to-image": "^1.11.13",
+    "jszip": "^3.10.2",
+    "lucide-react": "^1.76.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^8.6.2",
+    "@capacitor/cli": "^8.6.2",
+    "@capacitor/core": "^8.6.2",
+    "@types/node": "^24.19.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "~5.7.2",
+    "vite": "^6.2.0"
+  },
+  "build": {
+    "appId": "com.redcard.studio",
+    "productName": "RedCard Studio",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "public/**/*"
+    ],
+    "mac": {
+      "category": "public.app-category.graphics-design",
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "icon": "public/icons/icon-512.png"
+    },
+    "win": {
+      "target": [
+        "portable"
+      ],
+      "icon": "app.ico"
+    }
+  }
+}
