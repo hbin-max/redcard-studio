@@ -4,6 +4,12 @@
 
 ---
 
+## 🎬 30秒产品实操宣传片
+
+https://github.com/user-attachments/assets/faa6a9ba-c859-456d-ba10-4461b877fb5b
+
+---
+
 ## 全平台支持与安装指南 (Windows / Mac / Android / iPhone)
 
 本项目现已全面升级为跨端架构，支持 3 种形态在所有设备上独立运行：
