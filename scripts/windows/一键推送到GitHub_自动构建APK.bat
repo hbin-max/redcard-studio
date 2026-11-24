@@ -1,7 +1,7 @@
 @echo off
 setlocal
 chcp 65001 >nul
-cd /d "%~dp0"
+cd /d "%~dp0..\.." || exit /b 1
 
 git rev-parse --verify HEAD >nul 2>&1
 if errorlevel 1 (

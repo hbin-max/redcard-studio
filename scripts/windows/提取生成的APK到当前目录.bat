@@ -5,9 +5,9 @@ echo       RedCard Studio - 提取编译完成的 Android APK
 echo ========================================================
 echo.
 
-cd /d "%~dp0"
-set SOURCE_APK=%~dp0android\app\build\outputs\apk\debug\app-debug.apk
-set TARGET_APK=%~dp0RedCard_Studio.apk
+cd /d "%~dp0..\.." || exit /b 1
+set "SOURCE_APK=%CD%\android\app\build\outputs\apk\debug\app-debug.apk"
+set "TARGET_APK=%CD%\RedCard_Studio.apk"
 
 if exist "%SOURCE_APK%" (
     copy /y "%SOURCE_APK%" "%TARGET_APK%" >nul
