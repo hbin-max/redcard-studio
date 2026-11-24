@@ -1,94 +1,107 @@
-# RedCard Studio (小红书干货/测评图文生成器)
+<h1 align="center">RedCard Studio</h1>
 
-专为**小红书干货、数码测评、美妆成分、好物横评、思维模型与避坑指南**打造的一站式 AI 图文创作与多端发布工作台。
+<p align="center"><strong>A workspace for creating Xiaohongshu carousel posts.</strong><br>Draft the copy, edit portrait cards, and export a ready-to-review image deck.</p>
 
----
+<p align="center"><a href="#product-walkthrough">Walkthrough</a> · <a href="#quick-start">Quick start</a> · <a href="#card-types">Card types</a> · <a href="#desktop-and-mobile">Desktop and mobile</a> · <a href="#development">Development</a></p>
 
-## 🎬 30秒产品实操宣传片
+## Product walkthrough
 
 https://github.com/user-attachments/assets/faa6a9ba-c859-456d-ba10-4461b877fb5b
 
----
+## From a brief to a carousel
 
-## 💡 解决什么痛点？它能干什么？
+RedCard Studio is built for Xiaohongshu creators who publish product reviews, buying advice, skincare breakdowns, book notes, and practical explainers. A topic becomes a draft deck of 3:4 cards plus headline options, a post body, and suggested tags. One workspace keeps the image sequence and the text that accompanies it together.
 
-做一篇高质量的小红书干货或测评图文，往往需要 **写文案 → 找图抠图 → 调 3:4 对齐 → 画对比图表 → 反复改稿**，动辄耗时两三个小时。
+Start with a short brief and an optional reference image. Choose a scene preset, review the draft, and refine individual cards. Switch between focused editing and a deck overview to check whether the story makes sense from cover to conclusion. Copy the final text and export the images when they are ready.
 
-**RedCard Studio** 将整套创作链路浓缩到一个纯本地优先的工作台里：
-- **输入**：一句话选题需求 + 可选商品实拍/参考图；
-- **输出**：整套 **3:4 黄金比例小红书图文卡片组**（封面、参数对决、五维雷达、成分分析、红黑榜决策、读书金句、课代表结语）+ **3 种风格爆款标题、格式化正文与热门标签**；
-- **隐私与成本**：核心抠图与高清导出算法**100% 在本地浏览器端运行**，零云端抠图费用、商业素材零泄露，开箱即用。
+## What you can edit
 
----
+- **Deck structure.** Add, duplicate, move, or remove cards, or regenerate a selected card without regenerating the whole deck. Page numbers follow the current order.
+- **Card content.** Edit headings, body copy, metrics, and attribution in place. Change radar scores and review how the chart responds.
+- **Art direction.** Choose from six card themes and five workspace themes. Switch the workspace colors independently of the cards.
+- **Reference images.** Browser-side Canvas matting uses color similarity and background samples to separate a subject and can add a soft shadow. Use a plain, distinct background for the most predictable result. Inspect fine edges and transparent objects before export.
+- **Post copy.** Review three headline alternatives and edit the body and tags. Treat generated ratings, ingredient commentary, and product comparisons as drafts that need your own evidence.
+- **Output.** Export an individual high-resolution PNG or use the ZIP export for the whole deck. Image export uses 2.5× sampling in the browser. Upload the selected images and copy through your publishing platform.
 
-## ✨ 核心功能清单
+## Card types
 
-1. **⚡ 端侧 AI 智能去背景 (Smart Matting)**
-   - 基于 Canvas 边缘检测与色距算法，零成本一键抠出商品主体并自动注入商业摄影级立体软阴影，无需打开 PS 或调用付费抠图 API。
-2. **📊 多垂类专属数据可视化模板生态（5 大场景 · 8 种卡片）**
-   - **五维雷达综合打分卡**：纯 SVG 矢量动态渲染，5 维指标自由微调；
-   - **美妆成分分析避雷卡**：活性物配比、安全信号灯（安全 / 注意 / 慎入）与肤质适配建议；
-   - **读书认知思维金句卡**：大字原著金句排版与三层认知逻辑架构；
-   - **核心参数对决卡 & 选购决策红黑榜**：双栏高亮 PK 表格、闭眼入 vs 劝退组对照。
-3. **🧩 自由编排与「单页局部重生」 (Deck Orchestrator)**
-   - **行内所见即所得**：卡片上的标题、正文、数据、水印均可直接点击修改，不跑版；
-   - **局部重生**：对某一张卡片不满意时可单独重新生成这一页，其余页面与文案完全保留；
-   - **平铺全览**：支持加页、删页、复制、拖拽调整卡片顺序，页码全量自动重算。
-4. **✍️ 小红书爆款文案工作室**
-   - 同步生成**痛点反差型 / 深度测评型 / 干货利益型** 3 套高点击率标题、结构化正文与推荐标签，支持一键复制直接发布。
-5. **🎨 5 套工作台外观皮肤 & 6 套卡片主题**
-   - 工作台支持一键热切换：**经典黑曜红、素雅极简白、温润燕麦奶咖、深海夜阑蓝、松柏墨玉绿**；卡片支持独立切换 6 套高颜值视觉皮肤。
-6. **📦 2.5× 超采样高清无损导出**
-   - 支持单张 3:4 超清 PNG 导出，或全套卡片一键打包为 `.zip` 压缩包，直传小红书不压缩画质。
+| Card | Best used for |
+| --- | --- |
+| **Cover** | The headline and visual hook that establish the subject. |
+| **Radar** | A five-dimension rating with criteria you can edit. |
+| **Ingredient** | An ingredient breakdown and suitability notes. |
+| **Quote** | A sourced excerpt or a single idea with supporting takeaways. |
+| **Comparison** | A side-by-side spec or feature comparison. |
+| **Detail** | A caveat, a condition, or a practical tip. |
+| **Verdict** | A recommendation, trade-offs, and who should consider each option. |
+| **Outro** | An action checklist or a short wrap-up. |
 
----
+### An example editing pass
 
-## 📱 全平台支持与安装指南 (Windows / Mac / Android / iPhone)
+For a phone comparison, begin with the device names and the buying decision your readers face. Use the comparison card for measured specifications and a radar card for your own consistently applied criteria. Add a detail card for a caveat the headline would miss. Check the verdict and copy against the same criteria before exporting the ordered deck.
 
-本项目现已全面升级为跨端架构，支持在所有主流设备上独立运行：
+## Quick start
 
-### 1. 🪟 Windows 电脑端独立运行
-* **方式 A (便携版，免安装)**：
-  下载 GitHub Actions 构建产物 `RedCard-Studio-Windows.zip`，完整解压后双击 `RedCard Studio.exe`（仅 ~10 KB 原生启动器，调用系统 Edge/Chrome 独立窗口加载同目录 `dist` 页面）。
-* **方式 B (桌面独立窗口应用 PWA)**：
-  在 Edge 或 Chrome 浏览器地址栏右侧，点击 **【安装 RedCard】** 图标，即可像原生软件一样在独立窗口脱离浏览器运行。
-* **方式 C (Electron 独立客户端)**：
-  本项目已就绪 `electron/main.cjs` 桌面入口，运行以下命令即可启动原生桌面程序窗口：
-  ```bash
-  npm run build
-  npm run desktop:run
-  ```
-
-### 2. 🍏 Mac (苹果电脑) 独立运行
-* **macOS Sonoma+**：在 Safari 浏览器中打开网址，点击顶部菜单栏 **【文件】 ➔ 【添加到程序坞】**，即可作为独立 Mac 软件放入 Dock 和 Launchpad。
-* **Chrome 浏览器**：点击地址栏右侧的【安装】图标即可。
-* **DMG 文件**：可从 GitHub Actions 的 macOS 构建产物下载（直接分发时需另外配置 Apple 签名和公证）。
-
-### 3. 🤖 Android (安卓手机) 独立安装
-* **方式 A (PWA 极速安装，推荐)**：
-  在手机 Chrome 或 Edge 浏览器打开网页，点击右上角菜单 `...` ➔ 选择 **【安装应用 / 添加到主屏幕】**。
-* **方式 B (编译 Android 原生 APK)**：
-  仓库已包含完整 `android/` 原生工程。使用 Node.js 24、JDK 21 和 Android SDK 36，安装依赖后同步前端资源并打开项目：
-  ```bash
-  npm ci
-  npm run mobile:sync
-  npx cap open android
-  ```
-  在 Android Studio 中点击 `Build APK` 即可导出 `.apk` 安装包（也可直接从本仓库 GitHub Actions 下载云端构建好的 APK）。
-
-### 4. 🍎 iPhone / iPad (iOS) 独立安装
-1. 在手机 Safari 浏览器中打开本项目网页（如部署到局域网或云端域名）；
-2. 点击 Safari 底部中央的 **【分享】** 按钮（方框带向上箭头）；
-3. 向下滚动并点击 **【添加到主屏幕】**（Add to Home Screen）；
-4. 手机桌面上立刻生成独立 App 图标，点击即可享受全屏独立运行与离线缓存体验。
-
----
-
-## 🛠️ 本地开发与诊断检查
+Use Node.js 24 for the development commands. From your checkout:
 
 ```bash
 npm ci
+npm run dev
+```
+
+Open the URL printed by Vite. To inspect a production build locally:
+
+```bash
+npm run build
+npm run preview
+```
+
+The browser interface uses React, TypeScript, and Vite. Built-in templates can generate a starting deck locally. The optional model integration and the browser image tools serve separate purposes, so confirm what data a configured model provider receives before enabling it.
+
+### Generation modes
+
+Choose the built-in template mode for a quick local draft. If you configure an API key, the generation service can try a Chat Completions endpoint. When that request fails, the editor can fall back to the local draft and show a notice. Image matting and PNG rendering use browser APIs independently of the model.
+
+Before exporting, align the claims on the cover, comparison, and verdict cards. Export one card and inspect it at full size when the subject has complicated edges or when a caption is close to the page boundary. Then export the complete deck in the final reading order.
+
+## Desktop and mobile
+
+| Platform | How to run it |
+| --- | --- |
+| **Windows** | Use the browser app, a browser-installed PWA when offered, or the portable launcher from a matching [workflow artifact](https://github.com/hbin-max/redcard-studio/actions). Extract the complete artifact so the launcher can find the bundled web files. |
+| **macOS** | Use the browser app or Safari's Add to Dock when available. The repository also defines a macOS packaging job. Public desktop distribution may require signing and notarization. |
+| **Android** | Install through a supported mobile browser when available or build the bundled Capacitor Android project. |
+| **iPhone and iPad** | Open a served copy in Safari and add it to the Home Screen through the Share menu. |
+
+To launch the desktop Electron window from source:
+
+```bash
+npm run build
+npm run desktop:run
+```
+
+To prepare the Android project, install the JDK and SDK required by [the Android build variables](android/variables.gradle), then run:
+
+```bash
+npm run mobile:sync
+npx cap open android
+```
+
+Build an APK from Android Studio or use an artifact from a successful [cross-platform packaging run](.github/workflows/desktop-release.yml). PWA installation and offline availability depend on browser support and the app being served with its manifest and service worker.
+
+## Development
+
+```bash
 npm test
+npm run typecheck
 npm run build
 node test_diagnostics.cjs
 ```
+
+- [App and deck orchestration](src/App.tsx) manages the editor and deck state.
+- [Card renderer](src/components/CardView.tsx) handles layouts, inline editing, and radar charts.
+- [Generation service](src/services/aiGenerator.ts) handles draft generation and single-card regeneration.
+- [Image matting](src/utils/imageMatting.ts) and [export helpers](src/utils/exportHelper.ts) handle browser image processing and file output.
+- [Codebase map](CODEBASE_INDEX.md) and [engineering handover](HANDOFF_TO_CODEX.md) cover packaging, architecture, and implementation details.
+
+Licensed under the [MIT License](LICENSE).
