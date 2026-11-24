@@ -91,6 +91,8 @@ Build an APK from Android Studio or use an artifact from a successful [cross-pla
 
 ## Development
 
+The [Windows helper scripts](scripts/windows/) provide double-click shortcuts for launching Vite, creating a desktop shortcut from the source checkout, opening Android Studio, and copying a built debug APK to the repository root. The GitHub push helper is for maintainers. You can also run packaging manually from [GitHub Actions](https://github.com/hbin-max/redcard-studio/actions).
+
 ```bash
 npm test
 npm run typecheck

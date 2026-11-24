@@ -56,11 +56,14 @@
 ├── RedCard Studio.exe                   # Windows 独立原生绿色版客户端 (10.7 KB，双击即开)
 ├── test_diagnostics.cjs                 # 7 项核心能力自动化全量诊断测试工具
 ├── vite.config.ts                       # Vite 构建配置 (已开启 0.0.0.0 局域网移动端访问)
-├── 启动小红书图文工作台.bat             # Windows 1 键启动 Vite 开发服务器脚本
-├── 创建桌面快捷方式.bat                 # Windows 1 键在用户桌面生成红黑图标快捷方式脚本
-├── 在Android_Studio中打开项目.bat        # Windows 1 键在 Android Studio 中打开原生工程脚本
-├── 提取生成的APK到当前目录.bat          # Windows 1 键从 build 目录提取 APK 到根目录脚本
-├── 一键推送到GitHub_自动构建APK.bat    # Windows 1 键推送到 GitHub 并触发 Actions 云端构建脚本
+├── scripts/
+│   └── windows/                         # Windows 本地开发与发布辅助脚本
+│       ├── 启动小红书图文工作台.bat             # Windows 1 键启动 Vite 开发服务器脚本
+│       ├── 创建桌面快捷方式.bat                 # Windows 1 键在用户桌面生成红黑图标快捷方式脚本
+│       ├── 在Android_Studio中打开项目.bat        # Windows 1 键在 Android Studio 中打开原生工程脚本
+│       ├── 提取生成的APK到当前目录.bat          # Windows 1 键从 build 目录提取 APK 到根目录脚本
+│       ├── 一键推送到GitHub_自动构建APK.bat    # 推送当前分支的已提交内容
+│       └── create_shortcut.vbs         # Windows 桌面快捷方式生成器
 ├── HANDOFF_TO_CODEX.md                  # 致 Codex 的全面交接文件 (业务定位、历史演进、发布指导)
 └── CODEBASE_INDEX.md                    # 本文件 (代码仓库全景指向与架构索引)
 ```
@@ -133,11 +136,11 @@
 
 ## 四、本地一键便捷批处理脚本清单
 
-1. **`启动小红书图文工作台.bat`**：启动 Vite 本地开发热更新服务器；
-2. **`创建桌面快捷方式.bat`**：在 Windows 当前用户桌面上创建红黑图标的桌面快捷方式；
-3. **`一键推送到GitHub_自动构建APK.bat`**：协助用户将本地代码推送至新建的 GitHub 仓库，秒级触发 Actions 云端自动编译 APK；
-4. **`在Android_Studio中打开项目.bat`**：自动同步静态资源并在 Android Studio 中直接唤起 `android/` 原生工程；
-5. **`提取生成的APK到当前目录.bat`**：将 Android Studio 编译出来的 `app-debug.apk` 自动重命名并提取到项目根目录。
+1. **`scripts/windows/启动小红书图文工作台.bat`**：启动 Vite 本地开发热更新服务器；
+2. **`scripts/windows/创建桌面快捷方式.bat`**：在 Windows 当前用户桌面上创建红黑图标的桌面快捷方式；
+3. **`scripts/windows/一键推送到GitHub_自动构建APK.bat`**：将 main 或 master 上的已提交内容推送到 origin，由 GitHub Actions 触发打包；
+4. **`scripts/windows/在Android_Studio中打开项目.bat`**：自动同步静态资源并在 Android Studio 中直接唤起 `android/` 原生工程；
+5. **`scripts/windows/提取生成的APK到当前目录.bat`**：将 Android Studio 编译出来的 `app-debug.apk` 自动重命名并提取到项目根目录。
 
 ---
 *索引完毕。Codex 可依据此结构快速定位所需文件并安全开展代码维护或发布操作。*

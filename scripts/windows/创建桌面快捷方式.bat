@@ -5,7 +5,7 @@ echo       RedCard Studio - 一键创建桌面快捷方式
 echo ========================================================
 echo.
 
-cd /d "%~dp0"
+cd /d "%~dp0..\.." || exit /b 1
 
 if not exist "RedCard_Studio.exe" (
     echo [错误] 未在当前目录下找到 RedCard_Studio.exe！
@@ -13,7 +13,7 @@ if not exist "RedCard_Studio.exe" (
     exit /b
 )
 
-cscript //nologo create_shortcut.vbs
+cscript //nologo "%~dp0create_shortcut.vbs"
 
 if exist "%USERPROFILE%\Desktop\RedCard Studio.lnk" (
     echo.

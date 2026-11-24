@@ -823,7 +823,7 @@ export default function App() {
                     <span>渠道 2：一键在 Windows 桌面生成红黑图标快捷方式</span>
                   </div>
                   <p className="text-[11px] leading-relaxed" style={{ color: colors.textSecondary }}>
-                    项目根目录下已为您内置了 <strong>创建桌面快捷方式.bat</strong>，双击运行后立即在您的电脑桌面上生成专属高清图标！
+                    在 Windows 上双击项目中的 <strong>scripts/windows/创建桌面快捷方式.bat</strong>，即可为根目录中的 RedCard_Studio.exe 创建桌面快捷方式。
                   </p>
                 </div>
 

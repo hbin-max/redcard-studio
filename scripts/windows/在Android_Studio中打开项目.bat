@@ -5,7 +5,7 @@ echo       RedCard Studio - 正在打开 Android Studio 安卓工程
 echo ========================================================
 echo.
 
-cd /d "%~dp0"
+cd /d "%~dp0..\.." || exit /b 1
 echo 1. 正在同步最新前端页面代码到 Android 资源目录...
 call npm run mobile:sync
 if errorlevel 1 goto :failed

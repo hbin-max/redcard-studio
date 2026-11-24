@@ -103,7 +103,7 @@
 ### 阶段 6：Windows 独立客户端 (.exe) 编译交付
 - 在用户 Windows 电脑没有安装 Rust/Tauri 的限制下，采用 Windows 原生 C# 编译器（`csc.exe`）编译生成了仅 **10 KB** 的独立无黑窗桌面可执行文件：`RedCard Studio.exe`。
 - 内置极简 HTTP 静态监听服务，联动本地 Microsoft Edge 开启 `--app` 沉浸模式，秒级启动、无地址栏、进程退出自动释放内存。
-- 提供了 `创建桌面快捷方式.bat`，可一键在用户桌面上创建带高清红黑图标的桌面快捷方式。
+- 提供了 `scripts/windows/创建桌面快捷方式.bat`，可一键在用户桌面上创建带高清红黑图标的桌面快捷方式。
 
 ### 阶段 7：苹果 Mac 渠道原生化配置
 - 针对 macOS 系统 Gatekeeper 证书签名拦截机制，设计并实现了基于 Safari 17+ 原生能力的“添加到程序坞”标准方案（秒级在 Launchpad 生成官方免拦截的 `RedCard Studio.app`）。
@@ -154,7 +154,7 @@
   【Windows 桌面端】             【Apple 苹果电脑端】            【Android 安卓移动端】
   1. RedCard Studio.exe         1. Safari "添加到程序坞"        1. 局域网 WebAPK 秒装
      (本地已编译，10KB)            (免 Gatekeeper 拦截)          (无需开未知来源权限)
-  2. 一键创建桌面快捷方式.bat      2. GitHub Actions DMG 云编译   2. GitHub Actions 自动编译
+  2. 运行 scripts/windows/ 下的快捷方式脚本      2. GitHub Actions DMG 云编译   2. GitHub Actions 自动编译
   3. PWA 独立窗口运行              (.github/workflows/...)       (产出 RedCard-Studio.apk)
 ```
 
