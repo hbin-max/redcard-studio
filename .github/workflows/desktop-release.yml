@@ -10,7 +10,10 @@ on:
       - 'v*'
 
 permissions:
-  contents: write
+  contents: read
+
+env:
+  ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
 
 jobs:
   build-android:
@@ -20,21 +23,26 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup Java (JDK 17)
+      - name: Setup Java (JDK 21)
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
-          java-version: '17'
+          java-version: '21'
+
+      - name: Install Android SDK 36
+        run: sdkmanager 'platforms;android-36'
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: 'npm'
 
       - name: Install Dependencies
-        run: |
-          npm ci || npm install
+        run: npm ci
+
+      - name: Test Generation
+        run: npm test
 
       - name: Build Web Assets (dist)
         run: npm run build
@@ -58,6 +66,7 @@ jobs:
         with:
           name: RedCard-Studio-Android-APK
           path: build-out/RedCard-Studio.apk
+          if-no-files-found: error
 
   build-windows:
     name: Build Windows App (.exe)
@@ -69,28 +78,27 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: 'npm'
 
       - name: Install Dependencies
-        run: |
-          npm ci || npm install
-          npm install -D electron electron-builder
+        run: npm ci
+
+      - name: Compile Windows Launcher
+        run: npm run desktop:build-win
 
       - name: Build Web Assets (dist)
         run: npm run build
 
-      - name: Compile Native Lightweight Exe (C# Edge Host)
-        run: |
-          C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe /target:winexe /win32icon:app.ico /out:RedCard_Studio.exe launcher.cs
+      - name: Package Windows Launcher and Resources
+        run: Compress-Archive -Path 'RedCard Studio.exe', 'dist' -DestinationPath 'RedCard-Studio-Windows.zip'
 
       - name: Upload Windows Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: RedCard-Studio-Windows
-          path: |
-            RedCard_Studio.exe
-            RedCard Studio.exe
+          path: RedCard-Studio-Windows.zip
+          if-no-files-found: error
 
   build-mac:
     name: Build macOS DMG (.dmg / .zip)
@@ -102,21 +110,20 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: 'npm'
 
       - name: Install Dependencies
-        run: |
-          npm ci || npm install
-          npm install -D electron electron-builder
+        run: npm ci
 
       - name: Build Web Assets (dist)
         run: npm run build
 
       - name: Package macOS App (DMG & Universal)
-        run: npx electron-builder --mac --universal
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          npm run pack:mac
+          test -n "$(find release -maxdepth 1 -name '*.dmg' -print -quit)"
+          test -n "$(find release -maxdepth 1 -name '*.zip' -print -quit)"
 
       - name: Upload macOS Artifacts
         uses: actions/upload-artifact@v4
@@ -125,3 +132,4 @@ jobs:
           path: |
             release/*.dmg
             release/*.zip
+          if-no-files-found: error

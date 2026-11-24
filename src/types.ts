@@ -62,6 +62,7 @@ export interface CardModel {
   title: string;
   subtitle?: string;
   heroImage?: string; // 实拍图或抠图后透明图
+  heroReferenceId?: string;
   useMattedImage?: boolean; // 是否启用去背景
 
   // 1. Comparison specifics

@@ -1,4 +1,27 @@
-import type { CardModel, CardType, GenerationConfig, PostCopy, ReferenceImage, RadarAxis, IngredientItem } from '../types';
+import type { CardModel, CardType, GenerationConfig, PostCopy, ReferenceImage } from '../types';
+import { completionResponse, onlineDeck } from './onlineSchema.ts';
+
+type GenerationResult = { copy: PostCopy; cards: CardModel[]; notice?: string };
+let nextCardNumber = 0;
+
+export function newCardId() {
+  return `card-${++nextCardNumber}`;
+}
+
+export function referenceImageSource(image?: ReferenceImage) {
+  return image?.isMatted && image.mattedDataUrl ? image.mattedDataUrl : image?.dataUrl;
+}
+
+function getReferenceImage(config: GenerationConfig, images: ReferenceImage[]) {
+  return images.find(image => image.id === config.selectedImageId) ?? images[0];
+}
+
+function fallbackNotice(error: unknown) {
+  if (error instanceof DOMException && error.name === 'TimeoutError') return '模型请求超时，已使用本地模板。';
+  if (error instanceof Error && /^HTTP \d+$/.test(error.message)) return `在线生成失败（${error.message}），已使用本地模板。`;
+  if (error instanceof TypeError) return '无法连接模型接口，请检查接口地址和网络。已使用本地模板。';
+  return '模型返回的数据无法读取，已使用本地模板。';
+}
 
 /**
  * 智能小红书文案与卡片生成器
@@ -7,16 +30,16 @@ import type { CardModel, CardType, GenerationConfig, PostCopy, ReferenceImage, R
 export async function generateXiaohongshuContent(
   config: GenerationConfig,
   referenceImages: ReferenceImage[]
-): Promise<{ copy: PostCopy; cards: CardModel[] }> {
-  if (config.apiKey && config.apiKey.trim().length > 5) {
+): Promise<GenerationResult> {
+  const offline = generateOfflineSmartContent(config, referenceImages);
+  if (config.apiKey?.trim()) {
     try {
-      return await callOnlineLLM(config, referenceImages);
-    } catch (err: any) {
-      console.warn('在线 API 调用失败，自动降级为本地智能引擎:', err);
+      return await callOnlineLLM(config, referenceImages, offline.cards.map(card => card.type));
+    } catch (error) {
+      return { ...offline, notice: fallbackNotice(error) };
     }
   }
-
-  return generateOfflineSmartContent(config, referenceImages);
+  return offline;
 }
 
 /**
@@ -27,19 +50,24 @@ export async function regenerateSingleCard(
   card: CardModel,
   config: GenerationConfig,
   referenceImages: ReferenceImage[]
-): Promise<CardModel> {
-  const result = generateOfflineSmartContent(config, referenceImages);
-  // 从新生成的内容中寻找相同类型的卡片，或者创建全新变体
-  const matched = result.cards.find(c => c.type === card.type) || result.cards[0];
+): Promise<{ card: CardModel; notice?: string }> {
+  let notice: string | undefined;
+  let replacement: CardModel | undefined;
+  if (config.apiKey?.trim()) {
+    try {
+      replacement = (await callOnlineLLM(config, referenceImages, [card.type], card.title)).cards[0];
+    } catch (error) {
+      notice = fallbackNotice(error);
+    }
+  }
 
-  return {
-    ...matched,
-    id: card.id, // 保留原卡片唯一 ID
-    pageNum: card.pageNum,
-    totalPages: card.totalPages,
-    theme: config.theme,
-    footerAuthor: `@${config.authorName}`
-  };
+  if (!replacement) {
+    const matches = generateOfflineSmartContent(config, referenceImages).cards.filter(item => item.type === card.type);
+    replacement = matches.find(item => item.pageNum === card.pageNum) ?? matches[0]
+      ?? createNewCardTemplate(card.type, card.pageNum - 1, config, card.heroImage);
+  }
+
+  return { card: { ...replacement, id: card.id, pageNum: card.pageNum, totalPages: card.totalPages }, notice };
 }
 
 /**
@@ -54,7 +82,7 @@ export function createNewCardTemplate(
   const pageNum = totalCount + 1;
   const author = config.authorName || '测评研究所';
   const theme = config.theme;
-  const baseId = `card-${type}-${Date.now()}`;
+  const baseId = newCardId();
 
   switch (type) {
     case 'radar':
@@ -184,8 +212,24 @@ export function createNewCardTemplate(
         footerAuthor: `@${author}`
       };
 
+    case 'outro':
+      return {
+        id: baseId,
+        type: 'outro',
+        pageNum,
+        totalPages: pageNum,
+        theme,
+        badge: '课代表总结',
+        title: '行动清单与互动',
+        outro: {
+          checklist: ['回顾本篇要点', '选一条适合自己的建议开始实践'],
+          ctaText: '觉得有帮助，可以点赞收藏！',
+          interactionQuestion: '你还想了解哪些细节？',
+        },
+        footerAuthor: `@${author}`,
+      };
+
     case 'cover':
-    default:
       return {
         id: baseId,
         type: 'cover',
@@ -206,19 +250,29 @@ export function createNewCardTemplate(
  */
 async function callOnlineLLM(
   config: GenerationConfig,
-  referenceImages: ReferenceImage[]
-): Promise<{ copy: PostCopy; cards: CardModel[] }> {
+  referenceImages: ReferenceImage[],
+  cardTypes: CardType[],
+  previousTitle?: string
+): Promise<GenerationResult> {
   const baseUrl = config.apiBaseUrl?.trim() || 'https://api.openai.com/v1';
-  const endpoint = `${baseUrl.replace(/\/+$/, '')}/chat/completions`;
-  const model = config.modelName?.trim() || 'gpt-4o-mini';
+  const endpoint = new URL(baseUrl);
+  if (!['http:', 'https:'].includes(endpoint.protocol) || endpoint.username || endpoint.password) {
+    throw new TypeError('模型接口地址无效');
+  }
+  const endpointPath = endpoint.pathname.replace(/\/+$/, '');
+  endpoint.pathname = endpointPath.endsWith('/chat/completions') ? endpointPath : `${endpointPath}/chat/completions`;
+  const isDeepSeek = endpoint.hostname === 'api.deepseek.com';
+  const model = config.modelName?.trim() || (isDeepSeek ? 'deepseek-flash' : 'gpt-4o-mini');
 
-  const selectedImg = referenceImages.find(img => img.id === config.selectedImageId);
-  const heroImageSrc = selectedImg ? (selectedImg.isMatted && selectedImg.mattedDataUrl ? selectedImg.mattedDataUrl : selectedImg.dataUrl) : undefined;
+  const selectedImg = getReferenceImage(config, referenceImages);
+  const heroImageSrc = referenceImageSource(selectedImg);
 
   const systemPrompt = `你是一个深谙小红书算法与审美的爆款内容与排版设计专家。
 你的任务是将用户的需求和参考图片转换为：
 1. 吸引人点击的高爆款小红书文案（包含3个不同维度的标题、带emoji分段的正文、热门标签）；
-2. 5张结构严谨、适合转制为 3:4 比例卡片的结构化数据（封面页、对比页、细节拆解页、购买建议页、互动结语页）。
+2. ${cardTypes.length} 张适合 3:4 画幅的卡片，cards 必须按此顺序输出类型：${cardTypes.join('、')}。
+只输出所需的卡片类型。每张卡片文字简短，正文与卡片只使用用户提供的事实，缺少实测资料时用明确的示例或待补充表述，不编造测试成绩、成分功效或原著引文。
+${previousTitle ? `这是一次单页重写。围绕原卡片标题「${previousTitle}」重写这一页，仍返回 copy 和单张 cards。` : ''}
 
 必须严格按照以下 JSON 格式输出，不要有任何多余文字：
 {
@@ -283,77 +337,65 @@ async function callOnlineLLM(
       }
     }
   ]
-}`;
+}
+如果需要其他类型，使用以下结构（示例数据仅描述字段）：
+- radar: {"type":"radar","badge":"评分维度","title":"参考评分","radar":{"score":0,"summary":"待核对实测数据","axes":[{"label":"维度名","value":0}]}}，axes 必须包含五项，value 为 0–100。
+- ingredient: {"type":"ingredient","badge":"成分","title":"成分核对","ingredient":{"targetSkin":"待确认","items":[{"name":"成分名","role":"待确认","safety":"caution","score":1}],"verdict":"以成分表为准"}}，safety 取 safe/caution/warning，score 取 1–5。
+- quote: {"type":"quote","badge":"阅读","title":"阅读心得","quote":{"goldenQuote":"待补充出处","author":"待确认","bookTitle":"书名","threeLevels":["第一层","第二层","第三层"]}}。`;
 
-  const userContent: any[] = [
-    {
-      type: 'text',
-      text: `用户需求主题：${config.topic}
+  const userText = `用户需求主题：${config.topic}
 详细说明：${config.details}
 卡片分类：${config.category}
-署名作者：${config.authorName}`
-    }
-  ];
-
-  if (selectedImg) {
-    userContent.push({
-      type: 'image_url',
-      image_url: {
-        url: selectedImg.dataUrl
-      }
-    });
-  }
+署名作者：${config.authorName}`;
+  const userContent = selectedImg ? [
+    { type: 'text', text: userText },
+    { type: 'image_url', image_url: { url: selectedImg.dataUrl } },
+  ] : userText;
 
   const response = await fetch(endpoint, {
     method: 'POST',
+    signal: AbortSignal.timeout(60_000),
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${config.apiKey?.trim() || ''}`
     },
     body: JSON.stringify({
-      model: model,
+      model,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userContent }
       ],
       temperature: 0.7,
+      max_tokens: 4096,
+      ...(isDeepSeek ? { thinking: { type: 'disabled' } } : {}),
       response_format: { type: 'json_object' }
     })
   });
 
   if (!response.ok) {
-    throw new Error(`API 响应错误: ${response.status} ${response.statusText}`);
+    throw new Error(`HTTP ${response.status}`);
   }
 
-  const data = await response.json();
-  const rawText = data.choices[0]?.message?.content || '{}';
-  const parsed = JSON.parse(rawText);
+  const data = completionResponse.parse(await response.json());
+  const value: unknown = JSON.parse(data.choices[0].message.content);
+  const parsed = onlineDeck.parse(value);
+  const validatedCards = parsed.cards;
+  if (validatedCards.length !== cardTypes.length || validatedCards.some((card, index) => card.type !== cardTypes[index])) {
+    throw new Error('模型返回的卡片类型或页数有误');
+  }
 
-  const copy: PostCopy = {
-    titles: parsed.copy?.titles || [config.topic, `${config.topic} 全方位深度测评`, `建议收藏！${config.topic} 避坑指南`],
-    selectedTitleIndex: 0,
-    body: parsed.copy?.body || '',
-    tags: parsed.copy?.tags || ['#深度测评', '#干货分享', '#避坑指南']
-  };
-
-  const cards: CardModel[] = (parsed.cards || []).map((c: any, idx: number) => ({
-    id: `card-${idx + 1}-${Date.now()}`,
-    type: c.type || 'detail',
+  const cards: CardModel[] = validatedCards.map((card, idx) => ({
+    ...card,
+    id: newCardId(),
     pageNum: idx + 1,
     totalPages: parsed.cards.length,
     theme: config.theme,
-    badge: c.badge || '干货精选',
-    title: c.title || config.topic,
-    subtitle: c.subtitle,
-    heroImage: idx === 0 ? heroImageSrc : undefined,
-    comparison: c.comparison,
-    detail: c.detail,
-    verdict: c.verdict,
-    outro: c.outro,
+    heroImage: card.type === 'cover' ? heroImageSrc : undefined,
+    heroReferenceId: card.type === 'cover' ? selectedImg?.id : undefined,
     footerAuthor: `@${config.authorName}`
   }));
 
-  return { copy, cards };
+  return { copy: { ...parsed.copy, selectedTitleIndex: 0 }, cards };
 }
 
 /**
@@ -368,12 +410,12 @@ function generateOfflineSmartContent(
   const topic = rawTopic;
   const author = config.authorName || '测评研究所';
   
-  const selectedImg = referenceImages.find(img => img.id === config.selectedImageId) || referenceImages[0];
-  const heroImg = selectedImg ? (selectedImg.isMatted && selectedImg.mattedDataUrl ? selectedImg.mattedDataUrl : selectedImg.dataUrl) : undefined;
+  const selectedImg = getReferenceImage(config, referenceImages);
+  const heroImg = referenceImageSource(selectedImg);
 
-  const isTech = config.category === 'tech' || /手机|电脑|相机|数码|平板|芯片|iPad|iPhone|Mac/i.test(topic);
-  const isKnowledge = config.category === 'knowledge' || /学习|认知|效率|思维|读书|干货/i.test(topic);
-  const isSkincare = config.category === 'skincare' || /成分|护肤|面霜|精华|防晒|美白|修护/i.test(topic);
+  const isTech = config.category === 'tech';
+  const isKnowledge = config.category === 'knowledge';
+  const isSkincare = config.category === 'skincare';
 
   let titles: [string, string, string];
   let body: string;
@@ -721,6 +763,25 @@ function generateOfflineSmartContent(
         footerAuthor: `@${author}`
       }
     ];
+  } else if (config.category === 'tutorial') {
+    titles = [`${cleanTopic}｜三步操作指南`, `${cleanTopic}怎么开始？`, `${cleanTopic}的准备与检查清单`];
+    const steps = [
+      { title: '开始前先做准备', points: ['确定最后要交付的结果', '整理所需工具与资料', '预留一次试做的时间'] },
+      { title: '从最小步骤开始', points: ['先完成最简单的一步', '随手记下具体操作', '遇到卡点就退回上一步检查'] },
+      { title: '检查结果并复盘', points: ['对照原来的目标验收', '记录哪一步还需要调整', '把可复用的步骤整理成清单'] },
+    ];
+    body = `🛠️ ${topic}\n\n${steps.map(step => `${step.title}\n${step.points.map(point => `• ${point}`).join('\n')}`).join('\n\n')}`;
+    tags = ['#保姆级教程', '#步骤拆解', '#操作清单'];
+    cards = [
+      { ...createNewCardTemplate('cover', 0, config, heroImg), title: topic, subtitle: '准备、执行、检查，三步完成' },
+      ...steps.map((step, index) => ({
+        ...createNewCardTemplate('detail', index + 1, config),
+        badge: `步骤 ${index + 1}`,
+        title: step.title,
+        detail: { points: step.points.map((point, pointIndex) => ({ tag: `${pointIndex + 1}`, title: point, content: '可按你的具体操作补充说明。' })) },
+      })),
+      createNewCardTemplate('outro', 4, config),
+    ];
   } else {
     titles = [
       `🔥保姆级攻略！关于${cleanTopic}，看这篇就足够了`,
@@ -838,9 +899,20 @@ function generateOfflineSmartContent(
     copy: {
       titles,
       selectedTitleIndex: 0,
-      body,
+      body: [
+        '【本地模板示例】请用实际资料核对或替换示例内容。',
+        body,
+        config.details.trim() && `本篇关注点：${config.details.trim()}`,
+      ].filter(Boolean).join('\n\n'),
       tags
     },
-    cards
+    cards: cards.map((card, index) => ({
+      ...card,
+      id: newCardId(),
+      pageNum: index + 1,
+      totalPages: cards.length,
+      heroReferenceId: card.type === 'cover' ? selectedImg?.id : undefined,
+      badge: `模板示例 · ${card.badge}`,
+    })),
   };
 }

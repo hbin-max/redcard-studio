@@ -20,10 +20,10 @@
 * **方式 A (PWA 极速安装，推荐)**：
   在手机 Chrome 或 Edge 浏览器打开网页，点击右上角菜单 `...` ➔ 选择 **【安装应用 / 添加到主屏幕】**。
 * **方式 B (编译 Android 原生 APK)**：
-  本项目已集成 Capacitor 配置（`capacitor.config.json`），运行以下命令即可生成原生 Android Studio 工程：
+  仓库已包含 Android 工程。使用 Node.js 24、JDK 21 和 Android SDK 36，安装依赖后同步前端资源并打开项目。
   ```bash
+  npm ci
   npm run mobile:sync
-  npx cap add android
   npx cap open android
   ```
   在 Android Studio 中点击 `Build APK` 即可导出 `.apk` 安装包。
@@ -31,13 +31,14 @@
 ---
 
 ### 3. 🪟 Windows 电脑端独立运行
-* **方式 A (极速双击启动)**：
-  直接双击根目录下的 **`启动小红书图文工作台.bat`**，系统自动拉起本地极速服务并在浏览器中全屏开启。
+* **方式 A (便携版)**：
+  下载 GitHub Actions 的 `RedCard-Studio-Windows.zip`，完整解压后双击 `RedCard Studio.exe`。启动器使用 Edge 或 Chrome，并从同一目录的 `dist` 读取页面。
 * **方式 B (桌面独立窗口应用 PWA)**：
   在 Edge 或 Chrome 浏览器地址栏右侧，点击出现的 **【安装 RedCard】** 小电脑图标，即可像原生软件一样在独立窗口脱离浏览器运行。
 * **方式 C (Electron 独立客户端)**：
   本项目已就绪 `electron/main.cjs` 桌面入口，运行以下命令即可启动原生桌面程序窗口：
   ```bash
+  npm run build
   npm run desktop:run
   ```
 
@@ -46,6 +47,7 @@
 ### 4. 🍏 Mac (苹果电脑) 独立运行
 * **macOS Sonoma+**：在 Safari 浏览器中打开网址，点击顶部菜单栏 **【文件】 ➔ 【添加到程序坞】**，即可作为独立 Mac 软件放入 Dock 和 Launchpad。
 * **Chrome 浏览器**：点击地址栏右侧的【安装】图标即可。
+* **DMG 文件**：从 GitHub Actions 的 macOS 构建产物下载。直接分发时需另外配置 Apple 签名和公证。
 
 ---
 
@@ -62,3 +64,12 @@
    * **单页局部重生**：仅刷新不满意的那一张卡片，其余页面与爆款文案完全不变。
 4. **工作台外观 5 套皮肤**：经典黑曜红、素雅极简白、温润燕麦奶咖、深海夜阑蓝、松柏墨玉绿。
 5. **高清无损导出**：2.5倍超采样 3:4 PNG，全套卡片一键打包 ZIP。
+
+## 本地检查
+
+```bash
+npm ci
+npm test
+npm run build
+node test_diagnostics.cjs
+```

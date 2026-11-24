@@ -6,19 +6,14 @@ echo ========================================================
 echo.
 
 cd /d "%~dp0"
-set ANDROID_DIR=%~dp0android
-
 echo 1. 正在同步最新前端页面代码到 Android 资源目录...
-call npm run build
-call npx cap sync android
+call npm run mobile:sync
+if errorlevel 1 goto :failed
 
 echo.
 echo 2. 正在启动 Android Studio...
-if exist "E:\AndroidStudio\bin\studio64.exe" (
-    start "" "E:\AndroidStudio\bin\studio64.exe" "%ANDROID_DIR%"
-) else (
-    start "" "E:\use\新建文件夹 (6)\bin\studio64.exe" "%ANDROID_DIR%"
-)
+node scripts\open-android-studio.cjs
+if errorlevel 1 goto :failed
 
 echo.
 echo [成功] Android Studio 已启动并载入安卓工程！
@@ -31,3 +26,9 @@ echo   3. 编译完成后，点击右下角气泡里的【locate】链接即可�
 echo ========================================================
 echo.
 pause
+exit /b 0
+
+:failed
+echo [错误] Android 资源同步或项目打开失败，请检查上方输出。
+pause
+exit /b 1

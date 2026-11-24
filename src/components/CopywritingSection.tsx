@@ -11,7 +11,7 @@ interface CopywritingSectionProps {
 }
 
 export const CopywritingSection: React.FC<CopywritingSectionProps> = ({ copy, onUpdateCopy, uiTheme }) => {
-  const [copied, setCopied] = useState(false);
+  const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'error'>('idle');
   const [isEditingBody, setIsEditingBody] = useState(false);
 
   const colors = uiTheme.colors;
@@ -20,10 +20,8 @@ export const CopywritingSection: React.FC<CopywritingSectionProps> = ({ copy, on
   const handleCopyFull = async () => {
     const fullText = `${currentTitle}\n\n${copy.body}\n\n${copy.tags.join(' ')}`;
     const success = await copyToClipboard(fullText);
-    if (success) {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
+    setCopyStatus(success ? 'copied' : 'error');
+    if (success) setTimeout(() => setCopyStatus('idle'), 2000);
   };
 
   const handleTitleSelect = (index: number) => {
@@ -72,7 +70,7 @@ export const CopywritingSection: React.FC<CopywritingSectionProps> = ({ copy, on
             color: colors.btnPrimaryText,
           }}
         >
-          {copied ? (
+          {copyStatus === 'copied' ? (
             <>
               <Check className="w-3.5 h-3.5" />
               <span>已复制全文</span>
@@ -85,6 +83,7 @@ export const CopywritingSection: React.FC<CopywritingSectionProps> = ({ copy, on
           )}
         </button>
       </div>
+      {copyStatus === 'error' && <p role="status" className="text-xs" style={{ color: colors.textSecondary }}>复制失败，可手动选中文案复制。</p>}
 
       {/* 1. 3套备选爆款标题选择器 */}
       <div>

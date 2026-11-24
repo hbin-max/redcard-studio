@@ -25,6 +25,8 @@ android/capacitor-cordova-android-plugins/build/
 
 # Reference repos & binaries
 references/
+redcard-promo/
+redcard-reel-v2/
 *.lnk
 
 # Editor directories and files

@@ -43,64 +43,46 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showApiSettings, setShowApiSettings] = useState(false);
   const [isMatting, setIsMatting] = useState(false);
+  const [imageError, setImageError] = useState('');
 
   const colors = uiTheme.colors;
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? []);
+    event.target.value = '';
+    setImageError('');
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const rawDataUrl = event.target?.result as string;
-
-        // 针对超大尺寸手机/相机原图做自适应缩放压缩，防止卡死内存
-        const img = new Image();
-        img.onload = () => {
-          let width = img.width;
-          let height = img.height;
-          const maxDim = 1200;
-          let finalDataUrl = rawDataUrl;
-
-          if (width > maxDim || height > maxDim) {
-            if (width > height) {
-              height = Math.round((height * maxDim) / width);
-              width = maxDim;
-            } else {
-              width = Math.round((width * maxDim) / height);
-              height = maxDim;
-            }
-            const canvas = document.createElement('canvas');
-            canvas.width = width;
-            canvas.height = height;
-            const ctx = canvas.getContext('2d');
-            ctx?.drawImage(img, 0, 0, width, height);
-            finalDataUrl = canvas.toDataURL('image/jpeg', 0.88);
-          }
-
-          const newImg: ReferenceImage = {
-            id: `img-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-            name: file.name,
-            dataUrl: finalDataUrl,
-            role: 'product'
-          };
-          onAddImage(newImg);
-          if (!config.selectedImageId) {
-            onChangeConfig({ ...config, selectedImageId: newImg.id });
-          }
-        };
-        img.src = rawDataUrl;
-      };
-      reader.readAsDataURL(file);
+    for (const file of files) {
+      const url = URL.createObjectURL(file);
+      try {
+        const image = new Image();
+        image.src = url;
+        await image.decode();
+        const scale = Math.min(1, 1200 / Math.max(image.naturalWidth, image.naturalHeight));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+        canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+        const context = canvas.getContext('2d');
+        if (!context) throw new Error('无法读取图片画布');
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+        onAddImage({
+          id: url,
+          name: file.name,
+          dataUrl: canvas.toDataURL(file.type === 'image/jpeg' ? 'image/jpeg' : 'image/png', 0.88),
+          role: 'product',
+        });
+      } catch {
+        setImageError(`无法读取图片「${file.name}」，请换用 PNG 或 JPEG 图片。`);
+      } finally {
+        URL.revokeObjectURL(url);
+      }
     }
   };
-
   // 触发客户端智能去背景 / AI 抠图
   const handleToggleMatting = async () => {
     const selectedImg = referenceImages.find(img => img.id === config.selectedImageId);
     if (!selectedImg) return;
+    setImageError('');
 
     if (selectedImg.isMatted) {
       // 还原原图
@@ -121,6 +103,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       });
     } catch (err) {
       console.error('抠图处理失败:', err);
+      setImageError('去背景失败，请尝试更换图片。');
     } finally {
       setIsMatting(false);
     }
@@ -138,7 +121,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <aside
-      className="w-full lg:w-96 p-5 flex flex-col justify-between overflow-y-auto space-y-5 h-full transition-colors duration-300"
+      className="w-full lg:w-96 lg:shrink-0 p-5 flex flex-col justify-between lg:overflow-y-auto space-y-5 lg:h-full transition-colors duration-300"
       style={{
         backgroundColor: colors.sidebarBg,
         borderColor: colors.border,
@@ -218,6 +201,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <label className="text-[11px] block mb-1" style={{ color: colors.textSecondary }}>API Key</label>
               <input
                 type="password"
+                autoComplete="off"
                 placeholder="sk-..."
                 value={config.apiKey || ''}
                 onChange={(e) => onChangeConfig({ ...config, apiKey: e.target.value })}
@@ -234,8 +218,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <label className="text-[11px] block mb-1" style={{ color: colors.textSecondary }}>Model Name</label>
               <input
                 type="text"
-                placeholder="gpt-4o / qwen-vl-max / deepseek-chat"
-                value={config.modelName || 'gpt-4o-mini'}
+                placeholder="留空使用默认模型，如 deepseek-flash"
+                value={config.modelName ?? ''}
                 onChange={(e) => onChangeConfig({ ...config, modelName: e.target.value })}
                 className="w-full rounded-lg p-2 text-xs focus:outline-none"
                 style={{
@@ -246,6 +230,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 }}
               />
             </div>
+            <p className="text-[10px]" style={{ color: colors.textSecondary }}>在线生成会将输入文本和选中的参考图发送到此 API。</p>
           </div>
         )}
 
@@ -267,6 +252,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             className="hidden"
             onChange={handleFileChange}
           />
+          {imageError && <p role="status" className="mb-2 text-xs" style={{ color: colors.textSecondary }}>{imageError}</p>}
 
           {referenceImages.length === 0 ? (
             <div
@@ -312,6 +298,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         </div>
                       )}
                       <button
+                        aria-label={`删除参考图片 ${img.name}`}
                         onClick={(e) => {
                           e.stopPropagation();
                           onRemoveImage(img.id);

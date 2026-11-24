@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
+import { flushSync } from 'react-dom';
 import type { CardModel, CardType, GenerationConfig, PostCopy, ReferenceImage } from './types';
 import { UI_THEMES, type UiTheme } from './uiThemes';
-import { generateXiaohongshuContent, regenerateSingleCard, createNewCardTemplate } from './services/aiGenerator';
+import { generateXiaohongshuContent, regenerateSingleCard, createNewCardTemplate, newCardId, referenceImageSource } from './services/aiGenerator';
 import { Sidebar } from './components/Sidebar';
 import { CardView } from './components/CardView';
 import { CopywritingSection } from './components/CopywritingSection';
@@ -19,11 +20,9 @@ import {
   Check,
   Plus,
   RefreshCw,
-  Layers,
   Smartphone,
   Monitor,
   Apple,
-  ArrowDownToLine,
   X
 } from 'lucide-react';
 
@@ -38,7 +37,12 @@ export default function App() {
   });
 
   const [uiThemeKey, setUiThemeKey] = useState<string>(() => {
-    return localStorage.getItem('redcard_ui_theme') || 'dark-red';
+    try {
+      const saved = localStorage.getItem('redcard_ui_theme');
+      return saved && Object.hasOwn(UI_THEMES, saved) ? saved : 'dark-red';
+    } catch {
+      return 'dark-red';
+    }
   });
 
   const [showThemePicker, setShowThemePicker] = useState(false);
@@ -60,6 +64,11 @@ export default function App() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [regeneratingCardId, setRegeneratingCardId] = useState<string | null>(null);
   const [exportProgress, setExportProgress] = useState<string | null>(null);
+  const [exportCards, setExportCards] = useState<CardModel[]>([]);
+  const [operationMessage, setOperationMessage] = useState('');
+  const generationInProgress = useRef(false);
+  const regenerationInProgress = useRef(false);
+  const draggedCardId = useRef<string | null>(null);
 
   useEffect(() => {
     handleGenerate();
@@ -98,41 +107,57 @@ export default function App() {
 
   const handleSelectUiTheme = (key: string) => {
     setUiThemeKey(key);
-    localStorage.setItem('redcard_ui_theme', key);
+    try {
+      localStorage.setItem('redcard_ui_theme', key);
+    } catch {
+      // 存储不可用时仍然允许在当前窗口切换主题。
+    }
     setShowThemePicker(false);
   };
 
   const handleGenerate = async () => {
+    if (generationInProgress.current || regenerationInProgress.current) return;
+    generationInProgress.current = true;
     setIsGenerating(true);
-    setActiveCardIndex(0);
+    setOperationMessage('');
     try {
       const result = await generateXiaohongshuContent(config, referenceImages);
       setCopy(result.copy);
       setCards(result.cards);
       setActiveCardIndex(0);
+      setOperationMessage(result.notice ?? '');
     } catch (err) {
       console.error('生成失败:', err);
+      setOperationMessage('生成失败，请重试。');
     } finally {
+      generationInProgress.current = false;
       setIsGenerating(false);
     }
   };
 
   const handleAddImage = (img: ReferenceImage) => {
     setReferenceImages(prev => [...prev, img]);
+    setConfig(prev => prev.selectedImageId ? prev : { ...prev, selectedImageId: img.id });
+    setCards(prev => prev.map(card => card.type === 'cover' && !card.heroImage
+      ? { ...card, heroImage: referenceImageSource(img), heroReferenceId: img.id }
+      : card));
   };
 
   const handleUpdateImage = (updated: ReferenceImage) => {
     setReferenceImages(prev => prev.map(item => item.id === updated.id ? updated : item));
-    // 同步刷新封面使用的图片
-    const selectedSrc = updated.isMatted && updated.mattedDataUrl ? updated.mattedDataUrl : updated.dataUrl;
-    setCards(prev => prev.map((c, idx) => idx === 0 ? { ...c, heroImage: selectedSrc } : c));
+    setCards(prev => prev.map(card => card.heroReferenceId === updated.id
+      ? { ...card, heroImage: referenceImageSource(updated) }
+      : card));
   };
 
   const handleRemoveImage = (id: string) => {
-    setReferenceImages(prev => prev.filter(item => item.id !== id));
-    if (config.selectedImageId === id) {
-      setConfig(prev => ({ ...prev, selectedImageId: undefined }));
-    }
+    const remaining = referenceImages.filter(image => image.id !== id);
+    setReferenceImages(remaining);
+    const replacement = remaining.find(image => image.id === config.selectedImageId) ?? remaining[0];
+    setConfig(prev => prev.selectedImageId === id ? { ...prev, selectedImageId: replacement?.id } : prev);
+    setCards(prev => prev.map(card => card.heroReferenceId === id
+      ? { ...card, heroImage: referenceImageSource(replacement), heroReferenceId: replacement?.id }
+      : card));
   };
 
   const handleUpdateCard = (updated: CardModel) => {
@@ -144,8 +169,11 @@ export default function App() {
   // 1. 新增指定类型的卡片
   const handleAddNewCard = (type: CardType) => {
     const selectedImg = referenceImages.find(img => img.id === config.selectedImageId);
-    const heroImg = selectedImg ? (selectedImg.isMatted && selectedImg.mattedDataUrl ? selectedImg.mattedDataUrl : selectedImg.dataUrl) : undefined;
-    const newCard = createNewCardTemplate(type, cards.length, config, heroImg);
+    const heroImg = referenceImageSource(selectedImg);
+    const newCard = {
+      ...createNewCardTemplate(type, cards.length, config, heroImg),
+      heroReferenceId: type === 'cover' ? selectedImg?.id : undefined,
+    };
     
     const updatedCards = [...cards, newCard].map((c, idx, arr) => ({
       ...c,
@@ -161,15 +189,15 @@ export default function App() {
   // 2. 删除卡片
   const handleDeleteCard = (cardId: string) => {
     if (cards.length <= 1) return;
+    const deletedIndex = cards.findIndex(card => card.id === cardId);
+    if (deletedIndex < 0) return;
     const filtered = cards.filter(c => c.id !== cardId).map((c, idx, arr) => ({
       ...c,
       pageNum: idx + 1,
       totalPages: arr.length
     }));
     setCards(filtered);
-    if (activeCardIndex >= filtered.length) {
-      setActiveCardIndex(filtered.length - 1);
-    }
+    setActiveCardIndex(index => Math.min(index - Number(deletedIndex < index), filtered.length - 1));
   };
 
   // 3. 复制卡片
@@ -179,7 +207,7 @@ export default function App() {
     const target = cards[targetIdx];
     const cloned: CardModel = {
       ...JSON.parse(JSON.stringify(target)),
-      id: `card-${target.type}-${Date.now()}`
+      id: newCardId()
     };
     const nextList = [...cards];
     nextList.splice(targetIdx + 1, 0, cloned);
@@ -196,10 +224,11 @@ export default function App() {
   const handleMoveCard = (cardId: string, direction: 'prev' | 'next') => {
     const idx = cards.findIndex(c => c.id === cardId);
     if (idx === -1) return;
-    if (direction === 'prev' && idx === 0) return;
-    if (direction === 'next' && idx === cards.length - 1) return;
+    moveCard(idx, idx + (direction === 'prev' ? -1 : 1));
+  };
 
-    const targetIdx = direction === 'prev' ? idx - 1 : idx + 1;
+  const moveCard = (idx: number, targetIdx: number) => {
+    if (idx < 0 || idx === targetIdx || targetIdx < 0 || targetIdx >= cards.length) return;
     const nextList = [...cards];
     const [moved] = nextList.splice(idx, 1);
     nextList.splice(targetIdx, 0, moved);
@@ -216,32 +245,47 @@ export default function App() {
   // 5. 单页局部重新生成
   const handleRegenerateSingleCard = async (cardId: string) => {
     const target = cards.find(c => c.id === cardId);
-    if (!target) return;
+    if (!target || generationInProgress.current || regenerationInProgress.current) return;
+    regenerationInProgress.current = true;
+    setOperationMessage('');
     setRegeneratingCardId(cardId);
     try {
-      const refreshed = await regenerateSingleCard(target, config, referenceImages);
-      setCards(prev => prev.map(c => c.id === cardId ? refreshed : c));
+      const { card, notice } = await regenerateSingleCard(target, config, referenceImages);
+      setCards(prev => prev.map(c => c.id === cardId ? {
+        ...card, pageNum: c.pageNum, totalPages: c.totalPages, theme: c.theme, footerAuthor: c.footerAuthor,
+        heroImage: c.heroImage, heroReferenceId: c.heroReferenceId,
+      } : c));
+      setOperationMessage(notice ?? '');
     } catch (err) {
       console.error('单卡重生失败:', err);
+      setOperationMessage('这张卡片重新生成失败，请重试。');
     } finally {
+      regenerationInProgress.current = false;
       setRegeneratingCardId(null);
     }
   };
 
   // 导出单张
   const handleExportSingle = async () => {
-    if (cards.length === 0) return;
     const current = cards[activeCardIndex];
+    if (!current || exportCards.length > 0) return;
+    setOperationMessage('');
+    flushSync(() => setExportCards([current]));
     try {
       await exportCardAsPng(current.id, `小红书卡片_P${activeCardIndex + 1}_${current.title.slice(0, 10)}`);
     } catch (err) {
       console.error('单张导出失败:', err);
+      setOperationMessage('图片导出失败，请重试。');
+    } finally {
+      setExportCards([]);
     }
   };
 
   // 批量打包 ZIP
   const handleExportZip = async () => {
-    if (cards.length === 0) return;
+    if (cards.length === 0 || exportCards.length > 0) return;
+    setOperationMessage('');
+    flushSync(() => setExportCards(cards));
     setExportProgress('正在打包渲染中...');
     try {
       await exportAllCardsAsZip(cards, config.topic, (curr, total) => {
@@ -249,13 +293,21 @@ export default function App() {
       });
     } catch (err) {
       console.error('打包下载失败:', err);
+      setOperationMessage('ZIP 导出失败，请重试。');
     } finally {
       setExportProgress(null);
+      setExportCards([]);
     }
   };
 
   const handleConfigChange = (newConfig: GenerationConfig) => {
     setConfig(newConfig);
+    if (newConfig.selectedImageId !== config.selectedImageId) {
+      const selected = referenceImages.find(image => image.id === newConfig.selectedImageId);
+      setCards(prev => prev.map(card => card.type === 'cover'
+        ? { ...card, heroImage: referenceImageSource(selected), heroReferenceId: selected?.id }
+        : card));
+    }
     if (newConfig.theme !== config.theme) {
       setCards(prev => prev.map(c => ({ ...c, theme: newConfig.theme })));
     }
@@ -265,6 +317,7 @@ export default function App() {
   };
 
   const newCardTypeOptions: { type: CardType; label: string; desc: string; icon: string }[] = [
+    { type: 'cover', label: '封面卡', desc: '主题标题与参考图片', icon: '📕' },
     { type: 'radar', label: '📊 五维雷达评分卡', desc: '纯矢量多边形综合打分', icon: '📊' },
     { type: 'ingredient', label: '💄 美妆成分分析卡', desc: '活性物配比与安全信号灯', icon: '🧪' },
     { type: 'quote', label: '📖 读书思维金句卡', desc: '大字原著金句与三层认知框架', icon: '📖' },
@@ -276,7 +329,7 @@ export default function App() {
 
   return (
     <div
-      className="flex flex-col lg:flex-row h-screen w-screen overflow-hidden transition-colors duration-300 font-sans"
+      className="flex flex-col lg:flex-row min-h-dvh lg:h-dvh w-full lg:overflow-hidden transition-colors duration-300 font-sans"
       style={{
         backgroundColor: colors.appBg,
         color: colors.text,
@@ -296,10 +349,10 @@ export default function App() {
       />
 
       {/* 右侧主工作区 */}
-      <main className="flex-1 flex flex-col h-full overflow-hidden">
+      <main className="flex-1 min-w-0 flex flex-col lg:h-full">
         {/* 顶部操作工具条 */}
         <header
-          className="h-14 px-6 flex items-center justify-between shrink-0 backdrop-blur-md transition-colors duration-300 relative z-30"
+          className="min-h-14 px-3 sm:px-6 py-2 flex flex-wrap items-center justify-between gap-2 shrink-0 backdrop-blur-md transition-colors duration-300 relative z-30"
           style={{
             backgroundColor: colors.headerBg,
             borderColor: colors.border,
@@ -366,7 +419,7 @@ export default function App() {
               }}
             >
               <Info className="w-3.5 h-3.5" />
-              <span>悬浮卡片可拖拽、单页重生与删除</span>
+              <span>平铺全览支持拖动排序</span>
             </div>
           </div>
 
@@ -480,7 +533,7 @@ export default function App() {
             {/* 单张下载 */}
             <button
               onClick={handleExportSingle}
-              disabled={cards.length === 0}
+              disabled={cards.length === 0 || exportCards.length > 0}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition"
               style={{
                 backgroundColor: colors.inputBg,
@@ -496,7 +549,7 @@ export default function App() {
             {/* 一键打包 ZIP 下载 */}
             <button
               onClick={handleExportZip}
-              disabled={cards.length === 0 || !!exportProgress}
+              disabled={cards.length === 0 || exportCards.length > 0}
               className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition shadow-sm disabled:opacity-50 active:scale-95"
               style={{
                 background: colors.btnPrimary,
@@ -509,8 +562,14 @@ export default function App() {
           </div>
         </header>
 
+        {operationMessage && (
+          <p role="status" className="px-4 py-2 shrink-0 text-sm" style={{ color: colors.textSecondary }}>
+            {operationMessage}
+          </p>
+        )}
+
         {/* 内容展示区 */}
-        <div className="flex-1 grid grid-cols-1 xl:grid-cols-12 overflow-hidden">
+        <div className="flex-1 min-h-0 grid grid-cols-1 xl:grid-cols-12 lg:overflow-auto">
           {/* 左侧：3:4 卡片预览区 (占 7 列) */}
           <div
             className="xl:col-span-7 flex flex-col items-center justify-between p-4 sm:p-6 overflow-y-auto border-b xl:border-b-0 xl:border-r transition-colors duration-300"
@@ -532,6 +591,7 @@ export default function App() {
                     )}
 
                     <CardView
+                      key={cards[activeCardIndex].id}
                       card={cards[activeCardIndex]}
                       index={activeCardIndex}
                       total={cards.length}
@@ -611,7 +671,26 @@ export default function App() {
                 /* 平铺全览模式 */
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-4xl pb-8">
                   {cards.map((card, idx) => (
-                    <div key={card.id} className="w-full relative">
+                    <div
+                      key={card.id}
+                      className="w-full relative rounded-2xl"
+                      style={activeCardIndex === idx ? { outline: `2px solid ${colors.accent}`, outlineOffset: 2 } : undefined}
+                      onFocusCapture={() => setActiveCardIndex(idx)}
+                      onClick={event => {
+                        if (!(event.target as Element).closest('button')) setActiveCardIndex(idx);
+                      }}
+                      onDragOver={event => {
+                        if (!draggedCardId.current || draggedCardId.current === card.id) return;
+                        event.preventDefault();
+                        event.dataTransfer.dropEffect = 'move';
+                      }}
+                      onDrop={event => {
+                        if (!draggedCardId.current) return;
+                        event.preventDefault();
+                        moveCard(cards.findIndex(item => item.id === draggedCardId.current), idx);
+                        draggedCardId.current = null;
+                      }}
+                    >
                       <CardView
                         card={card}
                         index={idx}
@@ -622,6 +701,12 @@ export default function App() {
                         onDeleteCard={handleDeleteCard}
                         onDuplicateCard={handleDuplicateCard}
                         onMoveCard={handleMoveCard}
+                        onDragCard={(event) => {
+                          draggedCardId.current = card.id;
+                          event.dataTransfer.effectAllowed = 'move';
+                          event.dataTransfer.setData('text/plain', card.id);
+                        }}
+                        onDragEnd={() => { draggedCardId.current = null; }}
                       />
                     </div>
                   ))}
@@ -653,7 +738,7 @@ export default function App() {
       {showInstallModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div
-            className="w-full max-w-2xl rounded-2xl border shadow-2xl p-6 space-y-4 animate-in fade-in zoom-in-95 duration-200"
+            className="w-full max-w-2xl max-h-[90dvh] overflow-y-auto rounded-2xl border shadow-2xl p-6 space-y-4"
             style={{ backgroundColor: colors.panelBg, borderColor: colors.border, color: colors.text }}
           >
             {/* 弹窗头部 */}
@@ -724,23 +809,11 @@ export default function App() {
                     <div className="flex items-center gap-2 font-bold" style={{ color: colors.accent }}>
                       <span className="text-base">🪟</span>
                       <span className="text-sm">渠道 1：原生轻量 .exe (免安装绿色版)</span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-normal">体积仅 10KB</span>
                     </div>
                   </div>
                   <p className="text-[11px] leading-relaxed" style={{ color: colors.textSecondary }}>
-                    使用原生 C# 独立进程封装，纯净无黑窗、无浏览器地址栏，自动释放系统内存。
+                    从项目的 GitHub Actions 下载 RedCard-Studio-Windows.zip。解压后双击 RedCard Studio.exe，保持 dist 文件夹和 EXE 在同一目录。
                   </p>
-                  <div className="flex flex-wrap gap-2 pt-1">
-                    <a
-                      href="/RedCard_Studio.exe"
-                      download="RedCard_Studio.exe"
-                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition shadow-sm active:scale-95"
-                      style={{ background: colors.btnPrimary, color: colors.btnPrimaryText }}
-                    >
-                      <ArrowDownToLine className="w-4 h-4" />
-                      <span>直接下载 RedCard_Studio.exe</span>
-                    </a>
-                  </div>
                 </div>
 
                 {/* 渠道 B: 桌面快捷方式一键生成 */}
@@ -877,6 +950,13 @@ export default function App() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+      {exportCards.length > 0 && (
+        <div aria-hidden="true" className="fixed top-0 left-[-10000px] w-[384px] pointer-events-none">
+          {exportCards.map(card => (
+            <CardView key={card.id} card={card} index={card.pageNum - 1} total={card.totalPages} exportMode />
+          ))}
         </div>
       )}
     </div>

@@ -8,7 +8,7 @@ function createWindow() {
     minWidth: 1080,
     minHeight: 700,
     title: 'RedCard Studio - 小红书干货/测评图文生成器',
-    icon: path.join(__dirname, '../public/icons/icon-512.png'),
+    icon: path.join(__dirname, '../dist/icons/icon-512.png'),
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,

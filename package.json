@@ -3,25 +3,28 @@
   "productName": "RedCard Studio",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "typecheck": "tsc -b",
+    "test": "node --test tests/*.test.ts",
+    "build": "npm run typecheck && vite build",
     "preview": "vite preview",
     "pwa:build": "vite build",
     "mobile:sync": "vite build && npx cap sync",
-    "desktop:run": "node electron/main.cjs",
-    "desktop:build-win": "C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:winexe /win32icon:app.ico /out:RedCard_Studio.exe launcher.cs",
-    "pack:mac": "electron-builder --mac",
-    "pack:win": "electron-builder --win"
+    "desktop:run": "electron .",
+    "desktop:build-win": "node scripts/build-windows.cjs",
+    "pack:mac": "electron-builder --mac --universal --publish never",
+    "pack:win": "electron-builder --win --publish never"
   },
   "dependencies": {
-    "@esbuild/win32-x64": "^0.28.2",
     "html-to-image": "^1.11.13",
     "jszip": "^3.10.2",
     "lucide-react": "^1.76.0",
     "react": "^19.3.1",
-    "react-dom": "^19.3.1"
+    "react-dom": "^19.3.1",
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@capacitor/android": "^8.6.2",
@@ -31,8 +34,19 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^4.3.4",
+    "electron": "43.8.12",
+    "electron-builder": "26.18.1",
+    "tailwindcss": "3.4.17",
     "typescript": "~5.7.2",
     "vite": "^6.2.0"
+  },
+  "overrides": {
+    "@electron/universal": {
+      "minimatch": "11.0.1"
+    },
+    "app-builder-lib": {
+      "minimatch": "11.0.1"
+    }
   },
   "build": {
     "appId": "com.redcard.studio",
@@ -43,7 +57,7 @@
     "files": [
       "dist/**/*",
       "electron/**/*",
-      "public/**/*"
+      "!node_modules/**/*"
     ],
     "mac": {
       "category": "public.app-category.graphics-design",

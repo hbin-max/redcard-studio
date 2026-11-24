@@ -1,27 +1,46 @@
 import { toPng } from 'html-to-image';
 import JSZip from 'jszip';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import type { CardModel } from '../types';
+
+const cardExport = registerPlugin<{
+  save(options: { name: string; mimeType: 'image/png' | 'application/zip'; base64: string }): Promise<void>;
+}>('CardExport');
+
+function safeFilename(value: string) {
+  return value.replace(/[\/\\:*?"<>|\u0000-\u001f]/g, '_').replace(/[. ]+$/g, '').slice(0, 100);
+}
+
+async function renderCard(cardId: string) {
+  const node = document.getElementById(`export-${cardId}`);
+  if (!node) throw new Error(`找不到待导出的卡片 ${cardId}`);
+
+  await document.fonts.ready;
+  const png = await toPng(node, { pixelRatio: 2.5 });
+  if (!png.startsWith('data:image/png;base64,')) throw new Error('卡片渲染失败');
+  return png;
+}
+
+function download(url: string, filename: string) {
+  const link = document.createElement('a');
+  link.download = filename;
+  link.href = url;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
 
 /**
  * 导出单张卡片为超清 PNG (3:4 标准比例)
  */
 export async function exportCardAsPng(cardId: string, filename: string): Promise<void> {
-  const node = document.getElementById(`redcard-${cardId}`);
-  if (!node) {
-    throw new Error(`找不到卡片元素: redcard-${cardId}`);
+  const png = await renderCard(cardId);
+  const name = `${safeFilename(filename)}.png`;
+  if (Capacitor.getPlatform() === 'android') {
+    await cardExport.save({ name, mimeType: 'image/png', base64: png.split(',')[1] });
+    return;
   }
-
-  // 渲染为 2.5 倍高清晰度以确保手机上阅读绝对无噪点
-  const dataUrl = await toPng(node, {
-    pixelRatio: 2.5,
-    quality: 0.98,
-    cacheBust: true,
-  });
-
-  const link = document.createElement('a');
-  link.download = `${filename}.png`;
-  link.href = dataUrl;
-  link.click();
+  download(png, name);
 }
 
 /**
@@ -33,36 +52,29 @@ export async function exportAllCardsAsZip(
   onProgress?: (current: number, total: number) => void
 ): Promise<void> {
   const zip = new JSZip();
-  const folderName = `小红书图文_${topic.replace(/[\/\\:*?"<>|]/g, '_')}`;
+  const folderName = `小红书图文_${safeFilename(topic) || '未命名'}`;
   const imgFolder = zip.folder(folderName) || zip;
 
   for (let i = 0; i < cards.length; i++) {
     const card = cards[i];
-    const node = document.getElementById(`redcard-${card.id}`);
-    if (!node) continue;
-
-    if (onProgress) {
-      onProgress(i + 1, cards.length);
-    }
-
-    const dataUrl = await toPng(node, {
-      pixelRatio: 2.5,
-      quality: 0.98,
-      cacheBust: true,
-    });
+    onProgress?.(i + 1, cards.length);
+    const dataUrl = await renderCard(card.id);
 
     const base64Data = dataUrl.replace(/^data:image\/png;base64,/, '');
     const pageStr = String(i + 1).padStart(2, '0');
-    imgFolder.file(`P${pageStr}_${card.type}_${card.title.slice(0, 10)}.png`, base64Data, { base64: true });
+    imgFolder.file(`P${pageStr}_${card.type}_${safeFilename(card.title.slice(0, 10))}.png`, base64Data, { base64: true });
   }
 
+  const name = `${folderName}.zip`;
+  if (Capacitor.getPlatform() === 'android') {
+    const base64 = await zip.generateAsync({ type: 'base64' });
+    await cardExport.save({ name, mimeType: 'application/zip', base64 });
+    return;
+  }
   const content = await zip.generateAsync({ type: 'blob' });
   const url = URL.createObjectURL(content);
-  const link = document.createElement('a');
-  link.download = `${folderName}.zip`;
-  link.href = url;
-  link.click();
-  URL.revokeObjectURL(url);
+  download(url, name);
+  window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
 
 /**
@@ -72,14 +84,20 @@ export async function copyToClipboard(text: string): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(text);
     return true;
-  } catch (err) {
+  } catch {
     // 降级方案
     const textarea = document.createElement('textarea');
     textarea.value = text;
     document.body.appendChild(textarea);
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
     textarea.select();
-    const success = document.execCommand('copy');
-    document.body.removeChild(textarea);
-    return success;
+    try {
+      return document.execCommand('copy');
+    } catch {
+      return false;
+    } finally {
+      textarea.remove();
+    }
   }
 }

@@ -11,6 +11,7 @@ set TARGET_APK=%~dp0RedCard_Studio.apk
 
 if exist "%SOURCE_APK%" (
     copy /y "%SOURCE_APK%" "%TARGET_APK%" >nul
+    if errorlevel 1 goto :failed
     echo [成功] 已成功提取 APK 安装包！
     echo APK 文件已放置在: %TARGET_APK%
     echo 正在为您打开所在文件夹...
@@ -24,3 +25,9 @@ if exist "%SOURCE_APK%" (
 
 echo.
 pause
+exit /b 0
+
+:failed
+echo [错误] 复制 APK 失败，请检查目标路径和文件占用情况。
+pause
+exit /b 1

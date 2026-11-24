@@ -16,7 +16,7 @@ import {
   ChevronRight,
   Quote,
   Activity,
-  Check
+  GripVertical,
 } from 'lucide-react';
 
 interface CardViewProps {
@@ -24,11 +24,14 @@ interface CardViewProps {
   index: number;
   total: number;
   isEditable?: boolean;
+  exportMode?: boolean;
   onUpdateCard?: (updated: CardModel) => void;
   onRegenerateCard?: (cardId: string) => void;
   onDeleteCard?: (cardId: string) => void;
   onDuplicateCard?: (cardId: string) => void;
   onMoveCard?: (cardId: string, direction: 'prev' | 'next') => void;
+  onDragCard?: React.DragEventHandler<HTMLButtonElement>;
+  onDragEnd?: React.DragEventHandler<HTMLButtonElement>;
 }
 
 export const CardView: React.FC<CardViewProps> = ({
@@ -36,21 +39,35 @@ export const CardView: React.FC<CardViewProps> = ({
   index,
   total,
   isEditable = false,
+  exportMode = false,
   onUpdateCard,
   onRegenerateCard,
   onDeleteCard,
   onDuplicateCard,
-  onMoveCard
+  onMoveCard,
+  onDragCard,
+  onDragEnd,
 }) => {
   const theme = THEMES[card.theme] || THEMES.rose;
 
-  const handleTextChange = (field: string, value: string) => {
-    if (!onUpdateCard) return;
+  const handleTextChange = (field: 'badge' | 'title' | 'subtitle' | 'footerAuthor', value: string) => {
+    if (!onUpdateCard || card[field] === value) return;
     onUpdateCard({
       ...card,
       [field]: value
     });
   };
+
+  const edit = (update: (draft: CardModel, value: string) => void) => ({
+    contentEditable: isEditable ? 'plaintext-only' as const : false,
+    suppressContentEditableWarning: true,
+    onBlur: (event: React.FocusEvent<HTMLElement>) => {
+      if (!isEditable || !onUpdateCard) return;
+      const draft = structuredClone(card);
+      update(draft, event.currentTarget.innerText.trim());
+      onUpdateCard(draft);
+    },
+  });
 
   // 纯 SVG 动态五维雷达图数学计算 (中心点 120, 110, 半径 75)
   const renderRadarSvg = (axes: { label: string; value: number }[]) => {
@@ -71,7 +88,7 @@ export const CardView: React.FC<CardViewProps> = ({
     };
 
     // 多边形顶点连线
-    const dataPoints = axes.map((ax, i) => getCoord(i, Math.min(Math.max(ax.value / 100, 0.1), 1)));
+    const dataPoints = axes.map((ax, i) => getCoord(i, Math.min(Math.max(ax.value / 100, 0), 1)));
     const polygonPath = dataPoints.map(p => `${p.x},${p.y}`).join(' ');
 
     return (
@@ -134,8 +151,8 @@ export const CardView: React.FC<CardViewProps> = ({
 
   return (
     <div
-      id={`redcard-${card.id}`}
-      className="aspect-redbook w-full relative flex flex-col justify-between p-6 sm:p-7 rounded-2xl shadow-xl overflow-hidden select-none transition-all duration-300 group"
+      id={`${exportMode ? 'export' : 'redcard'}-${card.id}`}
+      className={`aspect-redbook w-full relative flex flex-col justify-between p-6 rounded-2xl shadow-xl overflow-hidden group ${exportMode ? 'h-[512px]' : 'sm:p-7 transition-all duration-300'}`}
       style={{
         backgroundColor: theme.bgCard,
         border: `1.5px solid ${theme.border}`,
@@ -152,7 +169,12 @@ export const CardView: React.FC<CardViewProps> = ({
       />
 
       {/* ===== 浮动卡片管理工具条 (Deck Orchestrator Bar - 仅悬浮时可见) ===== */}
-      <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900/90 text-white backdrop-blur-md px-3 py-1.5 rounded-full flex items-center gap-2 shadow-2xl border border-slate-700 text-xs">
+      {isEditable && <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity bg-slate-900/90 text-white backdrop-blur-md px-3 py-1.5 rounded-full flex items-center gap-2 shadow-2xl border border-slate-700 text-xs">
+        {onDragCard && (
+          <button type="button" draggable onDragStart={onDragCard} onDragEnd={onDragEnd} title="拖动排序" className="cursor-grab p-1 active:cursor-grabbing">
+            <GripVertical className="w-3.5 h-3.5" />
+          </button>
+        )}
         {onMoveCard && (
           <>
             <button
@@ -205,7 +227,7 @@ export const CardView: React.FC<CardViewProps> = ({
             <Trash2 className="w-3.5 h-3.5" />
           </button>
         )}
-      </div>
+      </div>}
 
       {/* ===== 顶部导航栏 (Top Bar) ===== */}
       <div className="relative z-10 flex items-center justify-between mb-4">
@@ -351,11 +373,9 @@ export const CardView: React.FC<CardViewProps> = ({
             <div
               className="rounded-xl p-3 border text-xs font-medium leading-relaxed"
               style={{ backgroundColor: theme.primaryLight, borderColor: theme.border, color: theme.text }}
-              contentEditable={isEditable}
-              suppressContentEditableWarning
             >
               <span className="font-bold block mb-0.5" style={{ color: theme.primary }}>💡 综合表现诊断：</span>
-              {card.radar.summary}
+              <span {...edit((draft, value) => { draft.radar!.summary = value; })}>{card.radar.summary}</span>
             </div>
           </div>
         )}
@@ -377,13 +397,11 @@ export const CardView: React.FC<CardViewProps> = ({
             <div
               className="rounded-lg p-2 mb-2 text-xs font-semibold flex items-center gap-2 border"
               style={{ backgroundColor: theme.bg, borderColor: theme.border, color: theme.text }}
-              contentEditable={isEditable}
-              suppressContentEditableWarning
             >
               <span className="text-[10px] font-black px-1.5 py-0.5 rounded text-white" style={{ backgroundColor: theme.primary }}>
                 适用建议
               </span>
-              <span className="text-[11px] truncate">{card.ingredient.targetSkin}</span>
+              <span className="text-[11px] truncate" {...edit((draft, value) => { draft.ingredient!.targetSkin = value; })}>{card.ingredient.targetSkin}</span>
             </div>
 
             {/* 成分列表 */}
@@ -399,10 +417,10 @@ export const CardView: React.FC<CardViewProps> = ({
                       ing.safety === 'safe' ? 'bg-emerald-500' : ing.safety === 'caution' ? 'bg-amber-500' : 'bg-rose-500'
                     }`} />
                     <div>
-                      <div className="font-bold text-xs" style={{ color: theme.text }} contentEditable={isEditable} suppressContentEditableWarning>
+                      <div className="font-bold text-xs" style={{ color: theme.text }} {...edit((draft, value) => { draft.ingredient!.items[iIdx].name = value; })}>
                         {ing.name}
                       </div>
-                      <div className="text-[10px]" style={{ color: theme.textMuted }} contentEditable={isEditable} suppressContentEditableWarning>
+                      <div className="text-[10px]" style={{ color: theme.textMuted }} {...edit((draft, value) => { draft.ingredient!.items[iIdx].role = value; })}>
                         {ing.role}
                       </div>
                     </div>
@@ -424,11 +442,9 @@ export const CardView: React.FC<CardViewProps> = ({
             <div
               className="text-[11px] p-2 rounded-lg font-medium"
               style={{ backgroundColor: theme.primaryLight, color: theme.text }}
-              contentEditable={isEditable}
-              suppressContentEditableWarning
             >
               <span className="font-bold" style={{ color: theme.primary }}>配方结论：</span>
-              {card.ingredient.verdict}
+              <span {...edit((draft, value) => { draft.ingredient!.verdict = value; })}>{card.ingredient.verdict}</span>
             </div>
           </div>
         )}
@@ -452,8 +468,7 @@ export const CardView: React.FC<CardViewProps> = ({
               <p
                 className="text-base sm:text-lg font-serif italic font-bold leading-relaxed relative z-10 text-center my-2"
                 style={{ color: theme.text }}
-                contentEditable={isEditable}
-                suppressContentEditableWarning
+                {...edit((draft, value) => { draft.quote!.goldenQuote = value; })}
               >
                 {card.quote.goldenQuote}
               </p>
@@ -466,13 +481,11 @@ export const CardView: React.FC<CardViewProps> = ({
                   key={lIdx}
                   className="rounded-xl p-2.5 border text-xs font-medium flex items-center gap-2"
                   style={{ backgroundColor: theme.primaryLight, borderColor: theme.border, color: theme.text }}
-                  contentEditable={isEditable}
-                  suppressContentEditableWarning
                 >
                   <span className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0" style={{ backgroundColor: theme.primary }}>
                     {lIdx + 1}
                   </span>
-                  <span className="truncate">{lvl}</span>
+                  <span className="truncate" {...edit((draft, value) => { draft.quote!.threeLevels[lIdx] = value; })}>{lvl}</span>
                 </div>
               ))}
             </div>
@@ -499,10 +512,10 @@ export const CardView: React.FC<CardViewProps> = ({
             >
               <div className="grid grid-cols-3 text-xs font-black py-2.5 px-3 border-b" style={{ borderColor: theme.border, backgroundColor: theme.primaryLight }}>
                 <span className="text-slate-400">对比维度</span>
-                <span className="text-center truncate focus:outline-none" style={{ color: theme.primary }} contentEditable={isEditable} suppressContentEditableWarning>
+                <span className="text-center truncate focus:outline-none" style={{ color: theme.primary }} {...edit((draft, value) => { draft.comparison!.colA = value; })}>
                   {card.comparison.colA}
                 </span>
-                <span className="text-center truncate focus:outline-none" style={{ color: theme.textLight }} contentEditable={isEditable} suppressContentEditableWarning>
+                <span className="text-center truncate focus:outline-none" style={{ color: theme.textLight }} {...edit((draft, value) => { draft.comparison!.colB = value; })}>
                   {card.comparison.colB}
                 </span>
               </div>
@@ -510,7 +523,7 @@ export const CardView: React.FC<CardViewProps> = ({
               <div className="divide-y" style={{ borderColor: theme.border }}>
                 {card.comparison.rows.map((row, rIdx) => (
                   <div key={rIdx} className="grid grid-cols-3 text-xs py-2 px-3 items-center">
-                    <span className="font-bold truncate text-[11px] focus:outline-none" style={{ color: theme.textMuted }} contentEditable={isEditable} suppressContentEditableWarning>
+                    <span className="font-bold truncate text-[11px] focus:outline-none" style={{ color: theme.textMuted }} {...edit((draft, value) => { draft.comparison!.rows[rIdx].metric = value; })}>
                       {row.metric}
                     </span>
                     <span
@@ -519,8 +532,7 @@ export const CardView: React.FC<CardViewProps> = ({
                         color: row.highlight === 'A' ? theme.primary : theme.text,
                         backgroundColor: row.highlight === 'A' ? theme.tagBg : 'transparent'
                       }}
-                      contentEditable={isEditable}
-                      suppressContentEditableWarning
+                      {...edit((draft, value) => { draft.comparison!.rows[rIdx].valA = value; })}
                     >
                       {row.valA}
                     </span>
@@ -530,8 +542,7 @@ export const CardView: React.FC<CardViewProps> = ({
                         color: row.highlight === 'B' ? theme.primary : theme.textLight,
                         backgroundColor: row.highlight === 'B' ? theme.tagBg : 'transparent'
                       }}
-                      contentEditable={isEditable}
-                      suppressContentEditableWarning
+                      {...edit((draft, value) => { draft.comparison!.rows[rIdx].valB = value; })}
                     >
                       {row.valB}
                     </span>
@@ -541,7 +552,7 @@ export const CardView: React.FC<CardViewProps> = ({
             </div>
 
             <div className="text-[11px] mt-2 flex items-center justify-between text-slate-400 font-medium px-1">
-              <span>注：数据来源于自费实测综合统计</span>
+              <span>对比内容请以实际资料为准</span>
               <span className="font-bold" style={{ color: theme.primary }}>高亮项更胜一筹 ✓</span>
             </div>
           </div>
@@ -569,15 +580,13 @@ export const CardView: React.FC<CardViewProps> = ({
                   border: `1px solid ${card.detail.alert.type === 'warning' ? '#FCA5A5' : theme.border}`,
                   color: card.detail.alert.type === 'warning' ? '#B91C1C' : theme.primary
                 }}
-                contentEditable={isEditable}
-                suppressContentEditableWarning
               >
                 {card.detail.alert.type === 'warning' ? (
                   <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-red-500" />
                 ) : (
                   <Lightbulb className="w-4 h-4 shrink-0 mt-0.5" style={{ color: theme.primary }} />
                 )}
-                <span className="leading-relaxed">{card.detail.alert.text}</span>
+                <span className="leading-relaxed" {...edit((draft, value) => { draft.detail!.alert!.text = value; })}>{card.detail.alert.text}</span>
               </div>
             )}
 
@@ -596,11 +605,11 @@ export const CardView: React.FC<CardViewProps> = ({
                     >
                       {pt.tag}
                     </span>
-                    <span className="text-xs font-bold truncate focus:outline-none" style={{ color: theme.text }} contentEditable={isEditable} suppressContentEditableWarning>
+                    <span className="text-xs font-bold truncate focus:outline-none" style={{ color: theme.text }} {...edit((draft, value) => { draft.detail!.points[pIdx].title = value; })}>
                       {pt.title}
                     </span>
                   </div>
-                  <p className="text-[11px] leading-relaxed line-clamp-2 focus:outline-none" style={{ color: theme.textLight }} contentEditable={isEditable} suppressContentEditableWarning>
+                  <p className="text-[11px] leading-relaxed line-clamp-2 focus:outline-none" style={{ color: theme.textLight }} {...edit((draft, value) => { draft.detail!.points[pIdx].content = value; })}>
                     {pt.content}
                   </p>
                 </div>
@@ -639,7 +648,7 @@ export const CardView: React.FC<CardViewProps> = ({
                 </span>
                 <ul className="text-[10px] space-y-1 text-emerald-900 font-medium">
                   {card.verdict.pros.map((p, idx) => (
-                    <li key={idx} className="truncate focus:outline-none" contentEditable={isEditable} suppressContentEditableWarning>• {p}</li>
+                    <li key={idx} className="truncate before:content-['•_']" {...edit((draft, value) => { draft.verdict!.pros[idx] = value; })}>{p}</li>
                   ))}
                 </ul>
               </div>
@@ -650,7 +659,7 @@ export const CardView: React.FC<CardViewProps> = ({
                 </span>
                 <ul className="text-[10px] space-y-1 text-rose-900 font-medium">
                   {card.verdict.cons.map((c, idx) => (
-                    <li key={idx} className="truncate focus:outline-none" contentEditable={isEditable} suppressContentEditableWarning>• {c}</li>
+                    <li key={idx} className="truncate before:content-['•_']" {...edit((draft, value) => { draft.verdict!.cons[idx] = value; })}>{c}</li>
                   ))}
                 </ul>
               </div>
@@ -660,11 +669,11 @@ export const CardView: React.FC<CardViewProps> = ({
             <div className="space-y-1.5 text-[11px]">
               <div className="rounded-lg p-2 bg-slate-50 border border-slate-200 flex items-start gap-1.5">
                 <span className="font-bold text-slate-800 shrink-0">🎯 闭眼入：</span>
-                <span className="text-slate-600 font-medium line-clamp-1 focus:outline-none" contentEditable={isEditable} suppressContentEditableWarning>{card.verdict.recommendWho}</span>
+                <span className="text-slate-600 font-medium line-clamp-1 focus:outline-none" {...edit((draft, value) => { draft.verdict!.recommendWho = value; })}>{card.verdict.recommendWho}</span>
               </div>
               <div className="rounded-lg p-2 bg-slate-50 border border-slate-200 flex items-start gap-1.5">
                 <span className="font-bold text-rose-600 shrink-0">🚫 劝退组：</span>
-                <span className="text-slate-600 font-medium line-clamp-1 focus:outline-none" contentEditable={isEditable} suppressContentEditableWarning>{card.verdict.avoidWho}</span>
+                <span className="text-slate-600 font-medium line-clamp-1 focus:outline-none" {...edit((draft, value) => { draft.verdict!.avoidWho = value; })}>{card.verdict.avoidWho}</span>
               </div>
             </div>
           </div>
@@ -696,7 +705,7 @@ export const CardView: React.FC<CardViewProps> = ({
                   <span className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-black text-white shrink-0 mt-0.5" style={{ backgroundColor: theme.primary }}>
                     {idx + 1}
                   </span>
-                  <span className="leading-tight focus:outline-none" contentEditable={isEditable} suppressContentEditableWarning>{item}</span>
+                  <span className="leading-tight focus:outline-none" {...edit((draft, value) => { draft.outro!.checklist[idx] = value; })}>{item}</span>
                 </div>
               ))}
             </div>
@@ -710,17 +719,15 @@ export const CardView: React.FC<CardViewProps> = ({
                 <MessageSquare className="w-3.5 h-3.5" />
                 <span>讨论互动</span>
               </div>
-              <p className="text-[11px] font-semibold mb-2 focus:outline-none" style={{ color: theme.text }} contentEditable={isEditable} suppressContentEditableWarning>
+              <p className="text-[11px] font-semibold mb-2 focus:outline-none" style={{ color: theme.text }} {...edit((draft, value) => { draft.outro!.interactionQuestion = value; })}>
                 {card.outro.interactionQuestion}
               </p>
               <div
                 className="text-[11px] font-bold px-3 py-1 rounded-full text-white shadow-sm flex items-center gap-1 focus:outline-none"
                 style={{ backgroundColor: theme.primary }}
-                contentEditable={isEditable}
-                suppressContentEditableWarning
               >
                 <Heart className="w-3 h-3 fill-current" />
-                <span>{card.outro.ctaText}</span>
+                <span {...edit((draft, value) => { draft.outro!.ctaText = value; })}>{card.outro.ctaText}</span>
               </div>
             </div>
           </div>
